@@ -1,3 +1,4 @@
+
 import torch
 import torch.nn as nn
 
@@ -78,3 +79,4 @@ if __name__=="__main__":
     mcnn=MCNN()
     out_dmap=mcnn(img)
     print(out_dmap.shape)
+

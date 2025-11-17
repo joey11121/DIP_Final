@@ -6,6 +6,71 @@ import matplotlib.cm as CM
 from mcnn_model import MCNN
 from my_dataloader import CrowdDataset
 
+def visualize_result(img_root, gt_dmap_root, model_param_path, index):
+    """
+    Generate a figure with:
+    1. Input Image
+    2. Ground Truth Density Map
+    3. Predicted Density Map (MCNN)
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load model
+    mcnn = MCNN().to(device)
+    mcnn.load_state_dict(torch.load(model_param_path))
+    mcnn.eval()
+
+    # Load dataset
+    dataset = CrowdDataset(img_root, gt_dmap_root, 4)
+    img, gt_dmap = dataset[index]   # img: [3,H,W], gt_dmap: [1,h,w]
+
+    # Prepare image for model
+    img_input = img.unsqueeze(0).to(device)
+
+    # Predict
+    with torch.no_grad():
+        pred_dmap = mcnn(img_input).cpu().squeeze(0).squeeze(0).numpy()
+
+    # GT to numpy
+    gt_dmap_np = gt_dmap.squeeze(0).numpy()
+
+    # --- Normalize for visualization ---
+    if gt_dmap_np.max() > 0:
+        gt_vis = gt_dmap_np / gt_dmap_np.max()
+    else:
+        gt_vis = gt_dmap_np
+
+    if pred_dmap.max() > 0:
+        pred_vis = pred_dmap / pred_dmap.max()
+    else:
+        pred_vis = pred_dmap
+
+    # --- Input image from tensor to numpy ---
+    img_np = img.permute(1, 2, 0).numpy()
+    img_np = img_np - img_np.min()
+    img_np = img_np / img_np.max()
+
+    # --- Plot figure ---
+    plt.figure(figsize=(15,5))
+
+    plt.subplot(1,3,1)
+    plt.title("Input Image")
+    plt.imshow(img_np)
+    plt.axis("off")
+
+    plt.subplot(1,3,2)
+    plt.title(f"GT Density (sum={gt_dmap_np.sum():.1f})")
+    plt.imshow(gt_vis, cmap=CM.jet)
+    plt.axis("off")
+
+    plt.subplot(1,3,3)
+    plt.title(f"Predicted Density (sum={pred_dmap.sum():.1f})")
+    plt.imshow(pred_vis, cmap=CM.jet)
+    plt.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
 
 def cal_mae(img_root,gt_dmap_root,model_param_path):
     '''
@@ -60,8 +125,9 @@ def estimate_density_map(img_root,gt_dmap_root,model_param_path,index):
 
 if __name__=="__main__":
     torch.backends.cudnn.enabled=False
-    img_root='D:\\workspaceMaZhenwei\\MCNN-pytorch\\data\\Shanghai_part_A\\test_data\\images'
-    gt_dmap_root='D:\\workspaceMaZhenwei\\MCNN-pytorch\\data\\Shanghai_part_A\\test_data\\ground_truth'
-    model_param_path='D:\\workspaceMaZhenwei\\MCNN-pytorch\\checkpoints\\epoch_63.param'
-    # cal_mae(img_root,gt_dmap_root,model_param_path)
-    # estimate_density_map(img_root,gt_dmap_root,model_param_path,3) 
+    img_root='./data/ShanghaiTech/part_A/test_data/images'
+    gt_dmap_root='./data/ShanghaiTech/part_A/test_data/ground-truth'
+    model_param_path='./checkpoints/1/mcnn_epoch_380.pth'
+    cal_mae(img_root,gt_dmap_root,model_param_path)
+    estimate_density_map(img_root,gt_dmap_root,model_param_path,3) 
+    visualize_result(img_root, gt_dmap_root, model_param_path, index=3)
